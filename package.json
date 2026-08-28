@@ -1,0 +1,16 @@
+{
+  "name": "griddb-cloud-node-python-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Node.js access to Azure Marketplace GridDB Cloud through the native Python API",
+  "scripts": {
+    "start": "node src/index.js",
+    "check": "node --check src/index.js && node --check src/griddb-client.js && .venv/bin/python -m py_compile python/griddb_worker.py scripts/doctor.py",
+    "doctor": "scripts/doctor-macos.sh",
+    "setup:mac": "scripts/setup-macos.sh"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
