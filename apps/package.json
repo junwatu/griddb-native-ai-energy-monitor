@@ -1,0 +1,25 @@
+{
+  "name": "griddb-energy-ai-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Workspace commands for the GridDB Energy AI example applications",
+  "workspaces": [
+    "dashboard",
+    "native-bridge"
+  ],
+  "scripts": {
+    "setup": "npm install",
+    "setup:mac": "npm run setup:mac --workspace=native-bridge",
+    "setup:linux": "node scripts/platform-setup.mjs linux",
+    "setup:windows": "node scripts/platform-setup.mjs windows",
+    "dev": "npm run dev --workspace=dashboard",
+    "dev:griddb": "node scripts/dev-griddb.mjs",
+    "build": "npm run build --workspace=dashboard",
+    "check": "node scripts/workspace-check.mjs",
+    "doctor": "node scripts/doctor.mjs"
+  },
+  "engines": {
+    "node": ">=18",
+    "npm": ">=9"
+  }
+}

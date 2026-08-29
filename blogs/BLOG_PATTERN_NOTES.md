@@ -60,4 +60,3 @@ while this one demonstrates the GridDB native client from Node.js through a
 persistent Python worker. The draft repeatedly distinguishes the GridDB Web API
 from the HTTPS Notification Provider discovery used by GridDB Cloud's public
 native route.
-

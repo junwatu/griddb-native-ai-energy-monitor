@@ -5,5 +5,5 @@ __pycache__/
 .venv/
 venv/
 .build/
-lib/*.jar
+apps/native-bridge/lib/*.jar
 GridDB_Cloud_doc_lib/

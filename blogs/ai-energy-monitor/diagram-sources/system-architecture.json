@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "AI Energy Monitor with GridDB Cloud",
+    "locale": "en",
+    "output": "system-architecture.html",
+    "quality_profile": "showcase",
+    "viewBox": [1390, 740]
+  },
+  "components": [
+    {
+      "id": "energy-source",
+      "type": "external",
+      "label": "Energy data source",
+      "sublabel": "MQTT meter or simulator",
+      "pos": [30, 300],
+      "size": [160, 72]
+    },
+    {
+      "id": "node-app",
+      "type": "backend",
+      "label": "Node.js application",
+      "sublabel": "Orchestration and cost logic",
+      "pos": [270, 300],
+      "size": [170, 72]
+    },
+    {
+      "id": "python-worker",
+      "type": "backend",
+      "label": "Python worker",
+      "sublabel": "Persistent NDJSON command loop",
+      "pos": [570, 300],
+      "size": [170, 72]
+    },
+    {
+      "id": "java-client",
+      "type": "backend",
+      "label": "JPype + JVM",
+      "sublabel": "GridDB Java native client",
+      "pos": [870, 300],
+      "size": [170, 72]
+    },
+    {
+      "id": "griddb-cloud",
+      "type": "database",
+      "label": "GridDB Cloud",
+      "sublabel": "TimeSeries data and forecasts",
+      "tag": "Azure Marketplace",
+      "pos": [1170, 300],
+      "size": [170, 72]
+    },
+    {
+      "id": "dashboard",
+      "type": "frontend",
+      "label": "Energy dashboard",
+      "sublabel": "Live usage, cost, forecast",
+      "pos": [270, 80],
+      "size": [170, 72]
+    },
+    {
+      "id": "forecast-model",
+      "type": "database",
+      "label": "Forecasting model",
+      "sublabel": "Local scikit-learn inference",
+      "tag": "Next 24 hours",
+      "pos": [570, 500],
+      "size": [170, 72]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "GridDB Cloud service",
+      "wraps": ["griddb-cloud"],
+      "pad": 28
+    }
+  ],
+  "connections": [
+    {
+      "id": "readings-ingest",
+      "from": "energy-source",
+      "to": "node-app",
+      "label": "energy readings",
+      "variant": "emphasis"
+    },
+    {
+      "id": "node-to-python",
+      "from": "node-app",
+      "to": "python-worker",
+      "label": "NDJSON over stdio",
+      "variant": "emphasis"
+    },
+    {
+      "id": "python-to-java",
+      "from": "python-worker",
+      "to": "java-client",
+      "label": "JPype calls"
+    },
+    {
+      "id": "native-database-path",
+      "from": "java-client",
+      "to": "griddb-cloud",
+      "label": "native TLS/TCP",
+      "variant": "security"
+    },
+    {
+      "id": "dashboard-output",
+      "from": "node-app",
+      "to": "dashboard",
+      "label": "metrics + forecast",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "local-forecasting",
+      "from": "python-worker",
+      "to": "forecast-model",
+      "label": "lagged features + local inference",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelDy": 24
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Persistent local bridge",
+      "items": [
+        "Node.js keeps one Python/JVM worker alive",
+        "No local HTTP service between Node.js and Python"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Native GridDB path",
+      "items": [
+        "Database operations do not use the GridDB Web API",
+        "The Java client protects native traffic with TLS"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Local AI",
+      "items": [
+        "Historical readings become lagged model features",
+        "Forecasts are written back to GridDB Cloud"
+      ]
+    }
+  ]
+}

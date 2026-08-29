@@ -137,7 +137,7 @@ Cloud SSL connection.
 
 ```bash
 git clone [GITHUB_REPOSITORY_URL]
-cd [REPOSITORY_DIRECTORY]
+cd [REPOSITORY_DIRECTORY]/apps/native-bridge
 ```
 
 ### 2. Install the public dependencies
@@ -316,13 +316,24 @@ Simulator or MQTT meter
  GridDB Cloud on Azure Marketplace
 ```
 
-> **Screenshot placeholder:** Rendered architecture diagram based on the flow
-> above.
+![AI energy monitor architecture using Node.js, Python, JPype, and GridDB Cloud](assets/system-architecture.webp)
+
+*Figure 1. Node.js orchestrates the application and exchanges NDJSON messages
+with a persistent Python worker. Python performs local forecasting and reaches
+GridDB Cloud through JPype, the GridDB Java client, and the native TLS/TCP
+connection—without using the Web API.*
 
 ## GridDB Schema
 
 The prototype uses one registry collection and two TimeSeries containers per
 meter.
+
+![GridDB schema and data flow for the AI energy monitor](assets/griddb-schema.webp)
+
+*Figure 2. The `devices` collection maps each meter to its raw TimeSeries. A
+local forecasting model reads recent observations, writes bounded predictions
+to a second TimeSeries, and the Node.js dashboard queries both actual and
+forecast data.*
 
 ### `devices` collection
 
@@ -459,6 +470,13 @@ operation establishes the actual connection.
 
 For private access through Azure VNet peering, omit `connection_route` and use
 the private connection values supplied for the GridDB Cloud environment.
+
+![Native Node.js-to-GridDB Cloud connection sequence](assets/native-connection-sequence.webp)
+
+*Figure 3. Node.js exchanges NDJSON only with a persistent local Python worker.
+JPype invokes the GridDB Java client inside the local JVM, and that native
+client—not Node.js or Python directly—opens the TLS/TCP connection to GridDB
+Cloud. The HTTPS Web API is not used.*
 
 ### Creating the TimeSeries container
 

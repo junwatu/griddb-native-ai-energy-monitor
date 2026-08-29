@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "GridDB Schema for the AI Energy Monitor",
+    "locale": "en",
+    "output": "griddb-schema.html",
+    "viewBox": [1080, 500],
+    "quality_profile": "showcase"
+  },
+  "stages": [
+    { "label": "Registry" },
+    { "label": "Observations" },
+    { "label": "Local AI" },
+    { "label": "Predictions" },
+    { "label": "Application" }
+  ],
+  "nodes": [
+    {
+      "id": "devices",
+      "type": "database",
+      "label": "devices",
+      "sublabel": "device registry and tariff",
+      "tag": "COLLECTION",
+      "stage": 0,
+      "row": 1,
+      "width": 150,
+      "height": 92
+    },
+    {
+      "id": "energy-series",
+      "type": "database",
+      "label": "energy_<device_id>",
+      "sublabel": "raw electrical readings",
+      "tag": "TIME_SERIES",
+      "stage": 1,
+      "row": 1,
+      "width": 180,
+      "height": 92
+    },
+    {
+      "id": "forecast-model",
+      "type": "backend",
+      "label": "Forecast model",
+      "sublabel": "lagged features + inference",
+      "tag": "LOCAL AI",
+      "stage": 2,
+      "row": 1,
+      "width": 170,
+      "height": 92
+    },
+    {
+      "id": "forecast-series",
+      "type": "database",
+      "label": "forecast_<device_id>",
+      "sublabel": "24-hour prediction rows",
+      "tag": "TIME_SERIES",
+      "stage": 3,
+      "row": 1,
+      "width": 180,
+      "height": 92
+    },
+    {
+      "id": "dashboard",
+      "type": "frontend",
+      "label": "Energy dashboard",
+      "sublabel": "actual, cost, and forecast",
+      "tag": "NODE.JS",
+      "stage": 4,
+      "row": 1,
+      "width": 170,
+      "height": 92
+    }
+  ],
+  "flows": [
+    {
+      "id": "device-container-map",
+      "from": "devices",
+      "to": "energy-series",
+      "label": "container_name selects series",
+      "classification": "one registry row per device",
+      "variant": "default",
+      "labelDy": -60
+    },
+    {
+      "id": "training-window",
+      "from": "energy-series",
+      "to": "forecast-model",
+      "label": "recent timestamped readings",
+      "classification": "24-hour feature window",
+      "variant": "emphasis",
+      "labelDy": -60
+    },
+    {
+      "id": "forecast-output",
+      "from": "forecast-model",
+      "to": "forecast-series",
+      "label": "prediction with bounds",
+      "classification": "generated forecast row",
+      "variant": "emphasis",
+      "labelDy": -60
+    },
+    {
+      "id": "forecast-query",
+      "from": "forecast-series",
+      "to": "dashboard",
+      "label": "latest forecast",
+      "classification": "read-only TQL query",
+      "variant": "default",
+      "labelDy": -60
+    },
+    {
+      "id": "actual-query",
+      "from": "energy-series",
+      "to": "dashboard",
+      "label": "actual usage window",
+      "classification": "read-only TQL query",
+      "variant": "dashed",
+      "route": "bottom-channel",
+      "fromSide": "bottom",
+      "toSide": "bottom"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "devices · Collection",
+      "items": [
+        "PK device_id STRING",
+        "container_name · display_name · device_type",
+        "rated_watts · price_per_kwh",
+        "active · installed_at"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "energy_<device_id> · TimeSeries",
+      "items": [
+        "PK timestamp TIMESTAMP",
+        "watts · voltage · current_amps",
+        "power_factor · interval_energy_wh",
+        "temperature_c · operating · quality"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "forecast_<device_id> · TimeSeries",
+      "items": [
+        "PK target_timestamp TIMESTAMP",
+        "predicted_energy_wh",
+        "lower_bound_wh · upper_bound_wh",
+        "model_version · generated_at"
+      ]
+    }
+  ]
+}

@@ -1,9 +1,50 @@
-# Node.js to GridDB Cloud through the native Python API
+# GridDB Energy AI
 
-This starter connects a Node.js application to **GridDB Cloud 3.2 from Azure
+This repository contains the native GridDB bridge, the dashboard prototype, and
+the accompanying article. The bridge connects a Node.js application to **GridDB Cloud 3.2 from Azure
 Marketplace** without using the GridDB Web API. Node keeps one Python worker
 alive and exchanges newline-delimited JSON over standard input/output. The
 Python client connects to GridDB using its native client interface.
+
+## Repository layout
+
+```text
+apps/
+  native-bridge/       Node.js -> Python/JPype -> GridDB Cloud client
+  dashboard/           React, shadcn/ui, and Tailwind dashboard prototype
+blogs/
+  ai-energy-monitor/   Article draft, publication assets, and diagram sources
+```
+
+Run all native-bridge commands below from `apps/native-bridge`.
+
+## Quick start
+
+Enter the runnable workspace, install its JavaScript dependencies, and start
+the mock-data dashboard:
+
+```bash
+cd apps
+npm install
+npm run dev
+```
+
+The `apps/` workspace commands are cross-platform:
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the mock dashboard |
+| `npm run build` | Create the dashboard production build |
+| `npm run check` | Check the native bridge and build the dashboard |
+| `npm run doctor` | Check Java, Maven, Python, GridDB JARs, and `.env` |
+| `npm run dev:griddb` | Validate, load `native-bridge/.env`, and run the native GridDB query example |
+| `npm run setup:mac` | Install the native dependencies on macOS |
+| `npm run setup:linux` | Reserved Linux native setup entry point |
+| `npm run setup:windows` | Reserved Windows native setup entry point |
+
+The Linux and Windows setup commands intentionally report that native setup is
+not automated yet. They provide a stable command surface while those installers
+are implemented; the mock dashboard works anywhere supported by Node.js.
 
 ## Architecture
 
@@ -38,6 +79,7 @@ allowlist this application's stable public outbound IP in GridDB Cloud.
 The setup script is idempotent and performs the complete public installation:
 
 ```bash
+cd apps/native-bridge
 npm run setup:mac
 ```
 

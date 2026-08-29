@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Node.js to GridDB Cloud: Native Connection Sequence",
+    "locale": "en",
+    "output": "native-connection-sequence.html",
+    "viewBox": [1080, 580],
+    "column_fit": "spread",
+    "quality_profile": "showcase"
+  },
+  "participants": [
+    {
+      "id": "node-app",
+      "type": "backend",
+      "label": "Node.js app",
+      "sublabel": "GridDBClient"
+    },
+    {
+      "id": "python-worker",
+      "type": "backend",
+      "label": "Python worker",
+      "sublabel": "persistent process"
+    },
+    {
+      "id": "jpype-jvm",
+      "type": "backend",
+      "label": "JPype + JVM",
+      "sublabel": "Python-Java bridge"
+    },
+    {
+      "id": "java-client",
+      "type": "backend",
+      "label": "GridDB Java client",
+      "sublabel": "Enterprise JARs"
+    },
+    {
+      "id": "griddb-cloud",
+      "type": "database",
+      "label": "GridDB Cloud",
+      "sublabel": "Azure Marketplace"
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 260,
+      "label": "Start the local bridge"
+    },
+    {
+      "from": 275,
+      "to": 505,
+      "label": "First native query"
+    }
+  ],
+  "messages": [
+    {
+      "id": "spawn-worker",
+      "from": "node-app",
+      "to": "python-worker",
+      "y": 175,
+      "label": "spawn griddb_worker.py",
+      "variant": "default"
+    },
+    {
+      "id": "start-jvm",
+      "from": "python-worker",
+      "to": "jpype-jvm",
+      "y": 210,
+      "label": "startJVM(classpath=lib/*.jar)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "create-store",
+      "from": "python-worker",
+      "to": "java-client",
+      "y": 245,
+      "label": "get_store(SSL, PUBLIC)",
+      "variant": "emphasis",
+      "note": "Lazy: no database session is opened yet"
+    },
+    {
+      "id": "query-request",
+      "from": "node-app",
+      "to": "python-worker",
+      "y": 290,
+      "label": "NDJSON query + request ID",
+      "variant": "emphasis",
+      "note": "stdin"
+    },
+    {
+      "id": "python-java-call",
+      "from": "python-worker",
+      "to": "jpype-jvm",
+      "y": 325,
+      "label": "get_container + query(TQL).fetch()",
+      "variant": "emphasis"
+    },
+    {
+      "id": "invoke-client",
+      "from": "jpype-jvm",
+      "to": "java-client",
+      "y": 360,
+      "label": "invoke Java GridStore API",
+      "variant": "default"
+    },
+    {
+      "id": "native-query",
+      "from": "java-client",
+      "to": "griddb-cloud",
+      "y": 395,
+      "label": "native TLS/TCP—not Web API",
+      "variant": "security"
+    },
+    {
+      "id": "cloud-rows",
+      "from": "griddb-cloud",
+      "to": "java-client",
+      "y": 425,
+      "label": "result rows",
+      "variant": "return"
+    },
+    {
+      "id": "java-values",
+      "from": "java-client",
+      "to": "python-worker",
+      "y": 455,
+      "label": "RowSet converted to Python values",
+      "variant": "return"
+    },
+    {
+      "id": "query-response",
+      "from": "python-worker",
+      "to": "node-app",
+      "y": 490,
+      "label": "NDJSON {id, ok, result}",
+      "variant": "return",
+      "note": "stdout resolves the matching Promise"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "python-worker",
+      "from": 170,
+      "to": 495,
+      "type": "backend"
+    },
+    {
+      "participant": "jpype-jvm",
+      "from": 205,
+      "to": 460,
+      "type": "backend"
+    },
+    {
+      "participant": "java-client",
+      "from": 240,
+      "to": 460,
+      "type": "backend"
+    },
+    {
+      "participant": "griddb-cloud",
+      "from": 390,
+      "to": 432,
+      "type": "database"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Persistent local bridge",
+      "items": [
+        "Node.js starts one Python worker and reuses it",
+        "NDJSON travels only over child-process stdin/stdout",
+        "Request IDs match replies to pending Promises"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Native database connection",
+      "items": [
+        "JPype invokes the GridDB Java client inside the local JVM",
+        "The Java client connects to GridDB Cloud using native TLS/TCP",
+        "No HTTPS request and no GridDB Web API are used"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Lazy Cloud session",
+      "items": [
+        "get_store creates a handle before network I/O",
+        "The first get, query, or put establishes the Cloud session",
+        "PUBLIC is used for the allowed public connection route"
+      ]
+    }
+  ]
+}
