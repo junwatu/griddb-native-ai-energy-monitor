@@ -34,6 +34,7 @@ The `apps/` workspace commands are cross-platform:
 | Command | Purpose |
 | --- | --- |
 | `npm run dev` | Start the mock dashboard |
+| `npm run init` | Create or validate the native GridDB containers |
 | `npm run build` | Create the dashboard production build |
 | `npm run check` | Check the native bridge and build the dashboard |
 | `npm run doctor` | Check Java, Maven, Python, GridDB JARs, and `.env` |

@@ -6,7 +6,7 @@
   "description": "AI home energy monitoring using GridDB Cloud",
   "scripts": {
     "start": "node src/index.js",
-    "check": "node --check src/index.js && node --check src/griddb-client.js && .venv/bin/python -m py_compile python/griddb_worker.py scripts/doctor.py",
+    "check": "node --check src/index.js && node --check src/griddb-client.js && .venv/bin/python -m py_compile python/griddb_worker.py python/init_schema.py scripts/doctor.py",
     "doctor": "scripts/doctor-macos.sh",
     "setup:mac": "scripts/setup-macos.sh"
   },

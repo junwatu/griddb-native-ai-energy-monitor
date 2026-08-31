@@ -12,6 +12,7 @@
     "setup:mac": "npm run setup:mac --workspace=native-bridge",
     "setup:linux": "node scripts/platform-setup.mjs linux",
     "setup:windows": "node scripts/platform-setup.mjs windows",
+    "init": "node scripts/init-griddb.mjs",
     "dev": "npm run dev --workspace=dashboard",
     "dev:griddb": "node scripts/dev-griddb.mjs",
     "build": "npm run build --workspace=dashboard",

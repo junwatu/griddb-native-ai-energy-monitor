@@ -137,7 +137,7 @@ Cloud SSL connection.
 
 ```bash
 git clone [GITHUB_REPOSITORY_URL]
-cd [REPOSITORY_DIRECTORY]/apps/native-bridge
+cd [REPOSITORY_DIRECTORY]/apps
 ```
 
 ### 2. Install the public dependencies
@@ -145,6 +145,7 @@ cd [REPOSITORY_DIRECTORY]/apps/native-bridge
 On macOS, run the included setup script:
 
 ```bash
+npm install
 npm run setup:mac
 ```
 
@@ -160,7 +161,7 @@ The script performs the following work:
 Install scikit-learn into the same virtual environment:
 
 ```bash
-.venv/bin/python -m pip install scikit-learn
+native-bridge/.venv/bin/python -m pip install scikit-learn
 ```
 
 ### 3. Install the GridDB Cloud Enterprise JAR
@@ -170,14 +171,14 @@ the Java EE package—not the Web API or C packages. In the downloaded bundle us
 for this project, the correct source file is:
 
 ```text
-GridDB_Cloud_doc_lib/griddb-ee-java-lib-5.9.0-linux.x86_64.rpm
+native-bridge/GridDB_Cloud_doc_lib/griddb-ee-java-lib-5.9.0-linux.x86_64.rpm
 ```
 
 Give that RPM to the included helper:
 
 ```bash
-scripts/install-cloud-jar.sh \
-  GridDB_Cloud_doc_lib/griddb-ee-java-lib-5.9.0-linux.x86_64.rpm
+native-bridge/scripts/install-cloud-jar.sh \
+  native-bridge/GridDB_Cloud_doc_lib/griddb-ee-java-lib-5.9.0-linux.x86_64.rpm
 ```
 
 Although the package is an RPM, `gridstore-advanced.jar` contains portable Java
@@ -194,7 +195,7 @@ usr/griddb-ee-5.9.0/lib/gridstore-advanced-5.9.0.jar
 It copies that file into the project using the stable runtime name:
 
 ```text
-lib/gridstore-advanced.jar
+native-bridge/lib/gridstore-advanced.jar
 ```
 
 Do not use `griddb-ee-webapi-5.9.0-linux.x86_64.rpm`; that package installs the
@@ -211,9 +212,12 @@ npm run doctor
 A successful local runtime check ends with:
 
 ```text
-GridDB Python: 5.9.0
-Public JARs: OK
-Cloud JAR: OK
+PASS  Java
+PASS  GridDB public JAR
+PASS  GridDB Cloud JAR
+PASS  Python GridDB runtime
+
+The local GridDB runtime is ready.
 ```
 
 ### 4. Configure environment variables
@@ -221,7 +225,7 @@ Cloud JAR: OK
 Copy the example environment file:
 
 ```bash
-cp .env.example .env
+cp native-bridge/.env.example native-bridge/.env
 ```
 
 Fill in the values from GridDB Cloud:
@@ -235,6 +239,7 @@ GRIDDB_PASSWORD='your-password'
 
 GRIDDB_CONNECTION_ROUTE='PUBLIC'
 GRIDDB_SSL_MODE='PREFERRED'
+GRIDDB_CONTAINER='energy_ac_office_01'
 PYTHON_BIN='./.venv/bin/python'
 ```
 
@@ -245,16 +250,46 @@ Load the variables:
 
 ```bash
 set -a
-source .env
+source native-bridge/.env
 set +a
 ```
 
-### 5. Create the schema and run the application
+The `apps/` workspace commands load `native-bridge/.env` automatically, so manual
+exporting is only necessary when running the native-bridge package directly.
+
+### 5. Initialize the GridDB containers
+
+Before the first run, initialize the application schema through the native
+GridDB connection:
 
 ```bash
-npm run schema
+npm run init
+```
+
+The initializer creates the `devices` registry and the raw-reading and forecast
+TimeSeries containers used by the sample devices. It is idempotent: running it
+again leaves compatible containers in place instead of deleting their data. If
+an existing container has an incompatible column definition, the command stops
+and reports the mismatch rather than silently replacing it.
+
+Initialization uses the same Node.js-to-Python bridge as the application. It
+does not call the GridDB Web API, and it closes the native GridDB connection
+after checking or creating the schema.
+
+An expected first run looks similar to this:
+
+```text
+Created collection: devices
+Created TimeSeries: energy_ac_office_01
+Created TimeSeries: forecast_ac_office_01
+Schema initialization complete; connection closed.
+```
+
+### 6. Seed sample data and run the application
+
+```bash
 npm run seed
-npm start
+npm run dev
 ```
 
 Open the URL printed by the application.
@@ -263,8 +298,8 @@ Open the URL printed by the application.
 http://localhost:3000
 ```
 
-> **Editorial TODO:** Add `schema`, `seed`, and dashboard scripts to the final
-> repository, then replace the command output and URL with verified values.
+> **Editorial TODO:** Implement and verify the `seed` command in the final
+> repository, then replace the dashboard URL with captured results.
 
 ## System Architecture
 
