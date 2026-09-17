@@ -39,13 +39,6 @@ and GridDB Cloud on Azure Marketplace. Node.js controls the application, Python
 runs a lightweight forecasting model, and GridDB stores timestamped electricity
 measurements and forecast results.
 
-There is one additional constraint: the application cannot use the GridDB Web
-API. Instead, Node.js keeps a Python worker alive and communicates with it over
-standard input and output. The Python client uses JPype and the GridDB Java API
-to communicate with GridDB Cloud using the native database protocol.
-
-We do not need to write Java application code, and we do not need to run a local
-HTTP service between Node.js and Python.
 
 ## What We Will Build
 
