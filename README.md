@@ -20,21 +20,46 @@ Run all native-bridge commands below from `apps/native-bridge`.
 
 ## Quick start
 
-Enter the runnable workspace, install its JavaScript dependencies, and start
-the mock-data dashboard:
+Enter the runnable workspace and install its JavaScript dependencies:
 
 ```bash
 cd apps
 npm install
-npm run dev
 ```
+
+To run the dashboard with real GridDB rows, initialize the containers and start
+the live native bridge:
+
+```bash
+npm run init
+npm run dev:live
+```
+
+Open <http://localhost:3000>. The browser calls a local Node endpoint on port
+3001. Node keeps the Python worker alive, and the worker connects to GridDB
+using the native protocol. GridDB credentials remain on the server and are
+never sent to the browser.
+
+If physical meter data is not available yet, this optional command inserts one
+day of deterministic demo readings into the real GridDB containers:
+
+```bash
+npm run seed
+npm run dev:live
+```
+
+The seed is only a demonstration input. The dashboard itself always reads the
+result from GridDB; it has no hard-coded device or chart data.
 
 The `apps/` workspace commands are cross-platform:
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Start the mock dashboard |
+| `npm run dev` | Start only the dashboard UI (the live adapter must be running separately) |
+| `npm run api` | Start only the local native GridDB adapter |
+| `npm run dev:live` | Start the dashboard and local native GridDB adapter together |
 | `npm run init` | Create or validate the native GridDB containers |
+| `npm run seed` | Insert optional deterministic demo readings into GridDB |
 | `npm run build` | Create the dashboard production build |
 | `npm run check` | Check the native bridge and build the dashboard |
 | `npm run doctor` | Check Java, Maven, Python, GridDB JARs, and `.env` |

@@ -104,7 +104,7 @@ def handle(store, request: dict[str, Any]) -> tuple[Any, bool]:
         row_set = container.query(request["tql"]).fetch()
         rows = []
         while row_set.has_next():
-            rows.append(json_value(row_set.get_next()))
+            rows.append(json_value(row_set.next()))
         return rows, False
 
     if operation == "get":

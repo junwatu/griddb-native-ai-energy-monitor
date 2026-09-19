@@ -2,11 +2,12 @@
   "name": "ai-energy-monitor",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "description": "AI home energy monitoring using GridDB Cloud",
+  "type": "module",
   "scripts": {
     "start": "node src/index.js",
-    "check": "node --check src/index.js && node --check src/griddb-client.js && .venv/bin/python -m py_compile python/griddb_worker.py python/init_schema.py scripts/doctor.py",
+    "server": "node src/server.js",
+    "check": "node --check src/index.js && node --check src/griddb-client.js && node --check src/server.js && .venv/bin/python -m py_compile python/griddb_worker.py python/init_schema.py python/seed_data.py scripts/doctor.py",
     "doctor": "scripts/doctor-macos.sh",
     "setup:mac": "scripts/setup-macos.sh"
   },
