@@ -109,20 +109,22 @@ Marketplace.
 For the public native route:
 
 1. Generate the Notification Provider URL from the Cloud dashboard.
+
+![Notification Provider URL in the GridDB Cloud dashboard](assets/notification-provider-url.png)
+
+
 2. Add the application's stable public outbound IP to the GridDB access list.
+
+![Network access list with the development IP](assets/network-access.png)
+
 3. Download the Enterprise Java library bundle from the Cloud Help or Downloads
-   area.
+
+![GridDB Cloud Library and Plugin download](assets/griddb-cloud-lib-plugin.png)
+
 4. Extract `gridstore-advanced.jar` from the downloaded RPM.
 
-The Enterprise JAR is not published on Maven Central. It is required for the
-Cloud SSL connection.
+The Enterprise JAR is not published on Maven Central. It is required for the Cloud SSL connection.
 
-> **Screenshot placeholder:** Notification Provider URL in the GridDB Cloud
-> dashboard.
-
-> **Screenshot placeholder:** Network access list with the development IP.
-
-> **Screenshot placeholder:** GridDB Cloud Library and Plugin download.
 
 ## How to Run
 
