@@ -1,14 +1,7 @@
 # Build an AI Energy Monitor with Node.js and GridDB Cloud Native API
 
-> **Editorial draft — remove before publication**
->
-> Repository URL, screenshots, final container names, and measured forecast
-> results are placeholders. The native bridge and its complete Java/Python
-> runtime—including the licensed `gridstore-advanced.jar`—have been validated
-> on Apple Silicon macOS. A complete GridDB Cloud connection test still requires
-> Cloud credentials and an allowlisted address. The energy simulator, schema setup,
-> model training, and dashboard described below should be implemented and tested
-> before this article is published.
+![blog cover](assets/blog-cover.jpeg)
+
 
 ## Table of Contents
 
