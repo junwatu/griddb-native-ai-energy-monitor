@@ -44,6 +44,27 @@ function sampleReadings(rows, maximum = 48) {
   return sampled;
 }
 
+function forecastContainerName(rawContainer) {
+  return rawContainer.startsWith("energy_")
+    ? `forecast_${rawContainer.slice("energy_".length)}`
+    : `forecast_${rawContainer}`;
+}
+
+function summarizeForecast(rows, pricePerKwh) {
+  if (rows.length === 0) return null;
+  const energyKwh = rows.reduce((sum, row) => sum + (Number(row[1]) || 0), 0) / 1000;
+  return {
+    energyKwh,
+    cost: energyKwh * pricePerKwh,
+    modelVersion: rows[0][4],
+    generatedAt: rows.at(-1)[5],
+    usage: sampleReadings(rows).map((row) => ({
+      timestamp: row[0],
+      loadKw: Number(row[1]) / 250,
+    })),
+  };
+}
+
 function summarize(device, rows, includeUsage) {
   const latest = rows.at(-1);
   const watts = rows.map((row) => Number(row[1])).filter(Number.isFinite);
@@ -93,6 +114,20 @@ async function dashboardData(selectedId) {
       return summarize(device, rows, device.id === selected.id);
     }),
   );
+
+  const selectedSummary = summaries.find((device) => device.id === selected.id);
+  if (selectedSummary) {
+    try {
+      const forecastRows = await client.query(
+        forecastContainerName(selected.container),
+        "SELECT * WHERE target_timestamp > NOW() ORDER BY target_timestamp ASC LIMIT 96",
+      );
+      selectedSummary.forecast = summarizeForecast(forecastRows, selected.pricePerKwh);
+    } catch (error) {
+      console.warn(`Forecast unavailable for ${selected.id}: ${error.message}`);
+      selectedSummary.forecast = null;
+    }
+  }
 
   return {
     source: "griddb",

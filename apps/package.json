@@ -14,6 +14,7 @@
     "setup:windows": "node scripts/platform-setup.mjs windows",
     "init": "node scripts/init-griddb.mjs",
     "seed": "node scripts/seed-griddb.mjs",
+    "forecast": "node scripts/forecast-griddb.mjs",
     "dev": "npm run dev --workspace=dashboard",
     "api": "node scripts/start-api.mjs",
     "dev:live": "node scripts/dev-live.mjs",

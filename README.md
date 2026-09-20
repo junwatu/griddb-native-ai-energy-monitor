@@ -45,11 +45,14 @@ day of deterministic demo readings into the real GridDB containers:
 
 ```bash
 npm run seed
+npm run forecast
 npm run dev:live
 ```
 
 The seed is only a demonstration input. The dashboard itself always reads the
-result from GridDB; it has no hard-coded device or chart data.
+result from GridDB; it has no hard-coded device or chart data. The forecast
+command trains a small local scikit-learn model, writes 96 predicted 15-minute
+intervals to the matching `forecast_*` TimeSeries, and closes the connection.
 
 The `apps/` workspace commands are cross-platform:
 
@@ -60,6 +63,7 @@ The `apps/` workspace commands are cross-platform:
 | `npm run dev:live` | Start the dashboard and local native GridDB adapter together |
 | `npm run init` | Create or validate the native GridDB containers |
 | `npm run seed` | Insert optional deterministic demo readings into GridDB |
+| `npm run forecast` | Generate and store the next 24-hour prediction |
 | `npm run build` | Create the dashboard production build |
 | `npm run check` | Check the native bridge and build the dashboard |
 | `npm run doctor` | Check Java, Maven, Python, GridDB JARs, and `.env` |

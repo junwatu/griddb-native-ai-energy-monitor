@@ -20,7 +20,7 @@ export PATH="${JAVA_HOME}/bin:${PATH}"
 python_bin="$(command -v python3.12 || command -v python3)"
 "${python_bin}" -m venv "${project_dir}/.venv"
 "${project_dir}/.venv/bin/python" -m pip install --upgrade pip setuptools wheel
-"${project_dir}/.venv/bin/python" -m pip install jpype1 pyarrow
+"${project_dir}/.venv/bin/python" -m pip install jpype1 pyarrow scikit-learn
 
 mkdir -p "${project_dir}/.build" "${project_dir}/lib"
 if [[ ! -d "${source_dir}/.git" ]]; then

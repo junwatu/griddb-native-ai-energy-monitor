@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/index.js",
     "server": "node src/server.js",
-    "check": "node --check src/index.js && node --check src/griddb-client.js && node --check src/server.js && .venv/bin/python -m py_compile python/griddb_worker.py python/init_schema.py python/seed_data.py scripts/doctor.py",
+    "check": "node --check src/index.js && node --check src/griddb-client.js && node --check src/server.js && .venv/bin/python -m py_compile python/griddb_worker.py python/init_schema.py python/seed_data.py python/forecast.py scripts/doctor.py",
     "doctor": "scripts/doctor-macos.sh",
     "setup:mac": "scripts/setup-macos.sh"
   },

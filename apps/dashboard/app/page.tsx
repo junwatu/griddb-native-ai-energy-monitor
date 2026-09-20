@@ -10,7 +10,14 @@ import {
   Sparkles,
   Zap,
 } from 'lucide-react';
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import {
+  Area,
+  CartesianGrid,
+  ComposedChart,
+  Line,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -32,6 +39,14 @@ import {
 
 type UsagePoint = { timestamp: string; loadKw: number };
 
+type Forecast = {
+  energyKwh: number;
+  cost: number;
+  modelVersion: string;
+  generatedAt: string;
+  usage: UsagePoint[];
+};
+
 type Device = {
   id: string;
   container: string;
@@ -47,6 +62,7 @@ type Device = {
   latestAt: string | null;
   quality: number | null;
   usage?: UsagePoint[];
+  forecast?: Forecast | null;
 };
 
 type DashboardData = {
@@ -59,7 +75,8 @@ type DashboardData = {
 const apiBaseUrl = 'http://127.0.0.1:3001';
 
 const chartConfig = {
-  load: { label: 'Load', color: 'var(--chart-1)' },
+  actual: { label: 'Actual', color: 'var(--chart-1)' },
+  forecast: { label: 'Forecast', color: 'var(--chart-2)' },
 } satisfies ChartConfig;
 
 function Metric({
@@ -143,14 +160,25 @@ export default function Home() {
     data?.devices[0];
   const usage = useMemo(
     () =>
-      (selected?.usage ?? []).map((point) => ({
-        time: new Date(point.timestamp).toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
-        load: Number(point.loadKw.toFixed(2)),
-      })),
-    [selected?.usage],
+      [
+        ...(selected?.usage ?? []).map((point) => ({
+          timestamp: point.timestamp,
+          time: new Date(point.timestamp).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          actual: Number(point.loadKw.toFixed(2)),
+        })),
+        ...(selected?.forecast?.usage ?? []).map((point) => ({
+          timestamp: point.timestamp,
+          time: new Date(point.timestamp).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          forecast: Number(point.loadKw.toFixed(2)),
+        })),
+      ].sort((left, right) => left.timestamp.localeCompare(right.timestamp)),
+    [selected?.forecast?.usage, selected?.usage],
   );
 
   return (
@@ -251,7 +279,7 @@ export default function Home() {
             </section>
 
             <section
-              className="grid gap-4 sm:grid-cols-3"
+              className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
               aria-label="Energy summary"
             >
               <Metric
@@ -269,14 +297,41 @@ export default function Home() {
                 value={`$${selected.cost.toFixed(2)}`}
                 note={`At $${selected.pricePerKwh.toFixed(3)} per kWh`}
               />
+              <Metric
+                label="Next 24 hours"
+                value={
+                  selected.forecast
+                    ? `${selected.forecast.energyKwh.toFixed(2)} kWh`
+                    : 'Not ready'
+                }
+                note={
+                  selected.forecast
+                    ? `Estimated cost $${selected.forecast.cost.toFixed(2)}`
+                    : 'Run npm run forecast'
+                }
+              />
             </section>
 
             <section className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
               <Card className="border-border/70 shadow-sm">
                 <CardHeader>
-                  <CardTitle className="text-base">Last 24 hours</CardTitle>
+                  <div className="flex items-center justify-between gap-4">
+                    <CardTitle className="text-base">
+                      Usage and prediction
+                    </CardTitle>
+                    <div className="flex gap-3 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1.5">
+                        <i className="size-2 rounded-full bg-emerald-600" />
+                        Actual
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <i className="size-2 rounded-full bg-violet-600" />
+                        Forecast
+                      </span>
+                    </div>
+                  </div>
                   <p className="text-sm text-muted-foreground">
-                    Native GridDB TimeSeries readings
+                    Previous and predicted 24-hour load
                   </p>
                 </CardHeader>
                 <CardContent>
@@ -286,7 +341,7 @@ export default function Home() {
                       className="h-[280px] w-full aspect-auto"
                       initialDimension={{ width: 720, height: 280 }}
                     >
-                      <AreaChart
+                      <ComposedChart
                         data={usage}
                         margin={{ left: 0, right: 8, top: 8, bottom: 0 }}
                         accessibilityLayer
@@ -301,12 +356,12 @@ export default function Home() {
                           >
                             <stop
                               offset="5%"
-                              stopColor="var(--color-load)"
+                              stopColor="var(--color-actual)"
                               stopOpacity={0.3}
                             />
                             <stop
                               offset="95%"
-                              stopColor="var(--color-load)"
+                              stopColor="var(--color-actual)"
                               stopOpacity={0.02}
                             />
                           </linearGradient>
@@ -328,12 +383,22 @@ export default function Home() {
                         <ChartTooltip content={<ChartTooltipContent />} />
                         <Area
                           type="monotone"
-                          dataKey="load"
-                          stroke="var(--color-load)"
+                          dataKey="actual"
+                          stroke="var(--color-actual)"
                           strokeWidth={2.5}
                           fill="url(#loadFill)"
+                          connectNulls={false}
                         />
-                      </AreaChart>
+                        <Line
+                          type="monotone"
+                          dataKey="forecast"
+                          stroke="var(--color-forecast)"
+                          strokeWidth={2.5}
+                          strokeDasharray="7 5"
+                          dot={false}
+                          connectNulls={false}
+                        />
+                      </ComposedChart>
                     </ChartContainer>
                   ) : (
                     <div className="grid h-[280px] place-items-center text-sm text-muted-foreground">
