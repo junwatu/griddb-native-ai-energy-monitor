@@ -2,7 +2,7 @@
   "name": "griddb-energy-ai-workspace",
   "version": "0.1.0",
   "private": true,
-  "description": "Workspace commands for the GridDB Energy AI example applications",
+  "description": "Workspace commands for the GridDB Energy AI applications",
   "workspaces": [
     "dashboard",
     "native-bridge"
@@ -21,7 +21,8 @@
     "dev:griddb": "node scripts/dev-griddb.mjs",
     "build": "npm run build --workspace=dashboard",
     "check": "node scripts/workspace-check.mjs",
-    "doctor": "node scripts/doctor.mjs"
+    "doctor": "node scripts/doctor.mjs",
+    "start": "npm run seed && npm run forecast && npm run dev:live"
   },
   "engines": {
     "node": ">=18",

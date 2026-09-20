@@ -131,8 +131,8 @@ The Enterprise JAR is not published on Maven Central. It is required for the Clo
 ### 1. Clone the repository
 
 ```bash
-git clone [GITHUB_REPOSITORY_URL]
-cd [REPOSITORY_DIRECTORY]/apps
+git clone https://github.com/junwatu/griddb-native-ai-energy-monitor.git
+cd griddb-native-ai-energy-monitor/apps
 ```
 
 ### 2. Install the public dependencies
@@ -161,9 +161,7 @@ native-bridge/.venv/bin/python -m pip install scikit-learn
 
 ### 3. Install the GridDB Cloud Enterprise JAR
 
-After downloading and extracting the GridDB Cloud document/library bundle, use
-the Java EE package—not the Web API or C packages. In the downloaded bundle used
-for this project, the correct source file is:
+After downloading and extracting the GridDB Cloud library bundle, use the Java EE package, not the Web API or C packages. In the downloaded bundle used for this project, the correct source file is:
 
 ```text
 native-bridge/GridDB_Cloud_doc_lib/griddb-ee-java-lib-5.9.0-linux.x86_64.rpm
@@ -176,10 +174,7 @@ native-bridge/scripts/install-cloud-jar.sh \
   native-bridge/GridDB_Cloud_doc_lib/griddb-ee-java-lib-5.9.0-linux.x86_64.rpm
 ```
 
-Although the package is an RPM, `gridstore-advanced.jar` contains portable Java
-bytecode and can be used on macOS after extraction. JPype and PyArrow are not
-platform-independent JARs; the setup script installs their matching macOS
-Python wheels separately.
+Although the package is an RPM, `gridstore-advanced.jar` contains portable Java bytecode and can be used on macOS after extraction. JPype and PyArrow are not platform-independent JARs; the setup script installs their matching macOSPython wheels separately.
 
 Inside the RPM, the helper finds the real versioned file:
 
@@ -261,11 +256,7 @@ GridDB connection:
 npm run init
 ```
 
-The initializer creates the `devices` registry and the raw-reading and forecast
-TimeSeries containers used by the sample devices. It is idempotent: running it
-again leaves compatible containers in place instead of deleting their data. If
-an existing container has an incompatible column definition, the command stops
-and reports the mismatch rather than silently replacing it.
+The initializer creates the `devices` registry and the raw-reading and forecast TimeSeries containers used by the sample devices. It is idempotent: running it again leaves compatible containers in place instead of deleting their data. If an existing container has an incompatible column definition, the command stopsand reports the mismatch rather than silently replacing it.
 
 Initialization uses the same Node.js-to-Python bridge as the application. It
 does not call the GridDB Web API, and it closes the native GridDB connection
@@ -283,9 +274,10 @@ Schema initialization complete; connection closed.
 ### 6. Seed sample data and run the application
 
 ```bash
-npm run seed
-npm run dev
+npm run start
 ```
+
+The command will seed sample data, run the forecasting model, and start the application.
 
 Open the URL printed by the application.
 
@@ -293,8 +285,7 @@ Open the URL printed by the application.
 http://localhost:3000
 ```
 
-> **Editorial TODO:** Implement and verify the `seed` command in the final
-> repository, then replace the dashboard URL with captured results.
+![app dashboard](assets/dashboard.png)
 
 ## System Architecture
 
@@ -319,9 +310,9 @@ and Python exchange newline-delimited JSON over stdin and stdout.
 
 ### Forecasting model
 
-Python trains a `HistGradientBoostingRegressor` using lagged energy values,
-hour-of-day, and day-of-week features. The model predicts total consumption for
-the next 24 hours. It runs locally inside the Python process and does not call an
+Python trains a `HistGradientBoostingRegressor` on hour-of-day and lagged
+wattage features, then recursively predicts the next 96 fifteen-minute
+intervals. It runs locally inside the Python process and does not call an
 external AI API.
 
 ### GridDB Cloud
@@ -330,21 +321,6 @@ GridDB stores the device registry, raw TimeSeries readings, forecasts, and
 alerts. A timestamp row key makes recent-window queries natural, while separate
 containers prevent different devices reporting at the same timestamp from
 colliding.
-
-```text
-Simulator or MQTT meter
-          |
-          v
-       Node.js
-          |
-          | NDJSON over stdin/stdout
-          v
- Python + JPype + Java client ----> Local scikit-learn model
-          |
-          | GridDB native protocol over TLS/TCP
-          v
- GridDB Cloud on Azure Marketplace
-```
 
 ![AI energy monitor architecture using Node.js, Python, JPype, and GridDB Cloud](assets/system-architecture.webp)
 
@@ -396,10 +372,10 @@ forecast data.*
 
 | Column | Type | Description |
 |---|---|---|
-| `target_timestamp` | TIMESTAMP, row key | End of forecast period |
-| `predicted_energy_wh` | DOUBLE | Predicted 24-hour consumption |
-| `lower_bound_wh` | DOUBLE | Lower estimate |
-| `upper_bound_wh` | DOUBLE | Upper estimate |
+| `target_timestamp` | TIMESTAMP, row key | Predicted interval timestamp in UTC |
+| `predicted_energy_wh` | DOUBLE | Predicted energy for this 15-minute interval |
+| `lower_bound_wh` | DOUBLE | Lower bound for this interval |
+| `upper_bound_wh` | DOUBLE | Upper bound for this interval |
 | `model_version` | STRING | Model identifier |
 | `generated_at` | TIMESTAMP | Forecast creation time |
 
@@ -607,106 +583,130 @@ makes the number easy to audit.
 ## Forecasting the Next 24 Hours
 
 The forecasting model has one job: predict how much energy the device will use
-during the next 24 hours.
+during the next 24 hours, one 15-minute interval at a time.
 
-We use scikit-learn's `HistGradientBoostingRegressor`. It is small enough to run
-locally, handles nonlinear relationships, and does not require a GPU or an
-external AI service.
+We use scikit-learn's `HistGradientBoostingRegressor` configured to stay small
+and fast (`learning_rate=0.08`, `max_iter=150`, `max_leaf_nodes=15`,
+`min_samples_leaf=4`, `l2_regularization=1.0`). It handles nonlinear
+relationships and does not require a GPU or an external AI service. The complete
+implementation lives in `python/forecast.py`.
 
-The model uses these features:
+### Training on seven days of history
 
-- Energy consumed during the most recent 15-minute interval
-- Energy consumed during the last hour
-- Energy consumed during the last 24 hours
-- Energy consumed during the previous 24-hour period
-- Hour of day and day of week
-- Current equipment temperature, if available
-
-The target is the sum of `interval_energy_wh` over the following 96 readings,
-which represents 24 hours at a 15-minute interval.
+The model trains on the most recent seven days of readings. The worker queries
+the device TimeSeries for the last 168 hours:
 
 ```python
-import numpy as np
-from sklearn.ensemble import HistGradientBoostingRegressor
-
-INTERVALS_PER_DAY = 96
-
-
-def build_training_data(rows):
-    energy = np.array([float(row[5]) for row in rows])
-    timestamps = [row[0] for row in rows]
-    temperatures = np.array([float(row[6]) for row in rows])
-
-    features = []
-    targets = []
-
-    for index in range(INTERVALS_PER_DAY * 2,
-                       len(rows) - INTERVALS_PER_DAY):
-        timestamp = timestamps[index]
-        features.append([
-            energy[index - 1],
-            energy[index - 4:index].sum(),
-            energy[index - 96:index].sum(),
-            energy[index - 192:index - 96].sum(),
-            timestamp.hour,
-            timestamp.weekday(),
-            temperatures[index - 1],
-        ])
-        targets.append(energy[index:index + 96].sum())
-
-    return np.asarray(features), np.asarray(targets)
-
-
-X, y = build_training_data(rows)
-model = HistGradientBoostingRegressor(
-    max_iter=200,
-    learning_rate=0.05,
-    random_state=42,
-)
-model.fit(X, y)
+row_set = container.query(
+    "SELECT * WHERE timestamp > TIMESTAMPADD(HOUR, NOW(), -168) "
+    "ORDER BY timestamp ASC"
+).fetch()
 ```
 
-The complete project should keep the newest data as a chronological test set.
-Do not randomly shuffle a time series before evaluation because that can leak
-future behavior into training. Scikit-learn's [lagged-feature forecasting
-example](https://scikit-learn.org/stable/auto_examples/applications/plot_time_series_lagged_features.html)
-demonstrates chronological evaluation.
+Forecasting needs history: `create_forecast` refuses to run with fewer than 16
+readings, and the first feature vector needs four lagged readings. The seed
+command inserts one day of demo readings, which is enough to run the model, but
+the daily pattern becomes more meaningful as real history accumulates over the
+full seven-day window.
 
-We also compare the model with a simple baseline: use the previous day's energy
-as the next-day prediction. If the model cannot consistently outperform that
-baseline, the application should keep the simpler prediction.
+### Features
 
-The model needs historical data. Cost calculations and fixed alerts work on the
-first day, but a meaningful weekly pattern may require several weeks of
-representative readings.
+Each reading becomes a feature vector with four values:
 
-> **Editorial TODO:** After running the completed project, add the training
-> period, test period, MAE/MAPE, baseline error, model error, and one forecast
-> chart. Do not publish an accuracy claim based only on simulated training data.
+- The hour of day encoded with `sin` and `cos`, so 23:00 and 00:00 are close
+  together in feature space and the model can reuse the daily load curve
+- The most recent wattage reading, which anchors the prediction to the current
+  consumption level
+- The mean of the last four readings, which summarizes the trend over the last
+  hour
+
+```python
+def feature(timestamp: dt.datetime, history: list[float]) -> list[float]:
+    hour = timestamp.hour + timestamp.minute / 60
+    angle = 2 * math.pi * hour / 24
+    return [
+        math.sin(angle),
+        math.cos(angle),
+        history[-1],
+        sum(history[-4:]) / min(4, len(history)),
+    ]
+```
+
+### One-step-ahead training, recursive prediction
+
+The model learns a one-step-ahead predictor. For every reading after the first
+four, the features describe everything observed before it, and the target is
+that reading itself.
+
+Predicting the future has no observations to draw on, so the forecast rolls
+forward one interval at a time. The loop starts from the last observed reading,
+predicts the next 15-minute value, and appends the prediction to the working
+history so the next step can use it. It repeats for 96 steps, exactly 24 hours
+at a 15-minute interval:
+
+```python
+rolling = list(watts)
+for step in range(1, HORIZON + 1):
+    target_timestamp = start + dt.timedelta(minutes=INTERVAL_MINUTES * step)
+    predicted_watts = max(0.0, float(model.predict([feature(target_timestamp, rolling)])[0]))
+    rolling.append(predicted_watts)
+```
+
+### Error band from the training MAE
+
+After fitting, the worker predicts its own training readings again and computes
+the mean absolute error (MAE) between predictions and targets:
+
+```python
+fitted = model.predict(np.asarray(features))
+mae = float(np.mean(np.abs(np.asarray(targets) - fitted)))
+```
+
+Every prediction carries an uncertainty band derived from that MAE. The band is
+the larger of 1.64 times the training MAE and 10 percent of the predicted
+value: the MAE term scales with the model's observed accuracy, while the
+percentage floor keeps the band meaningful when the prediction is near zero:
+
+```python
+error_band = max(mae * 1.64, predicted_watts * 0.1)
+```
 
 ### Saving the forecast
 
-The result is stored in `forecast_<device_id>`:
+The result is stored in `forecast_<device_id>`. Each row is one forecast
+interval. Watts are converted to interval energy in watt-hours by multiplying
+by 0.25, because one 15-minute interval is a quarter of an hour, and the bounds
+are clipped at zero:
 
 ```python
-forecast_container.put([
-    forecast_end,
-    float(predicted_wh),
-    float(lower_bound_wh),
-    float(upper_bound_wh),
-    "hist-gradient-v1",
-    datetime.now(timezone.utc),
-])
+forecasts.put(
+    (
+        target_timestamp,
+        predicted_watts * 0.25,
+        max(0.0, predicted_watts - error_band) * 0.25,
+        (predicted_watts + error_band) * 0.25,
+        "hist-gradient-v1",
+        generated_at,
+    )
+)
 ```
 
 Using `target_timestamp` as the row key means a newer calculation replaces the
-older forecast for the same target period. This keeps the dashboard focused on
-the latest prediction.
+older forecast for the same target interval. This keeps the dashboard focused
+on the latest prediction.
+
+> **Editorial TODO:** The MAE above is measured in-sample on the training
+> readings. Before publishing an accuracy claim, hold out the newest readings
+> as a chronological test set and evaluate on them--shuffling a time series
+> leaks future behavior into training. Scikit-learn's [lagged-feature
+> forecasting example](https://scikit-learn.org/stable/auto_examples/applications/plot_time_series_lagged_features.html)
+> demonstrates chronological evaluation. Add the test-period MAE/MAPE and one
+> forecast chart after running the completed project.
 
 ## Reading Results in Node.js
 
-Node.js queries both recent readings and the latest forecast, then prepares a
-small view model:
+Node.js queries the last 24 hours of readings and the next 24 hours of forecast
+rows, then prepares a small view model:
 
 ```js
 const [readings, forecasts] = await Promise.all([
@@ -716,20 +716,27 @@ const [readings, forecasts] = await Promise.all([
   ),
   client.query(
     "forecast_ac_office_01",
-    "SELECT * ORDER BY target_timestamp DESC LIMIT 1",
+    "SELECT * WHERE target_timestamp > NOW()"
+      + " ORDER BY target_timestamp ASC LIMIT 96",
   ),
 ]);
 
-const actualWh = readings.reduce((sum, row) => sum + row[5], 0);
-const predictedWh = forecasts[0]?.[1] ?? null;
+const actualKwh = readings.reduce((sum, row) => sum + row[5], 0) / 1000;
+const forecastKwh = forecasts.reduce((sum, row) => sum + row[1], 0) / 1000;
 ```
+
+The forecast query returns up to 96 rows: one per 15-minute interval, covering
+the next 24 hours. The dashboard sums the `predicted_energy_wh` column for the
+24-hour total and cost, and draws the rows as a dashed curve next to the
+measured readings. The chart therefore shows the past 24 hours of actual load
+followed by the next 24 hours of prediction.
 
 The dashboard can show:
 
 - Current watts
 - Energy consumed today
 - Estimated cost today
-- Previous 24-hour chart
+- 24-hour chart with actual readings followed by the forecast
 - Predicted next-24-hour energy and cost
 - Data quality and last reading time
 
