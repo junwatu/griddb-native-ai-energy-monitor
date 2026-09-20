@@ -773,26 +773,6 @@ A production adapter should also handle:
 - Measurement quality
 - Device-specific scaling factors
 
-## What Uses HTTP and What Does Not?
-
-This project does not use the GridDB Web API. Database reads and writes travel
-through the GridDB native client protocol over a TLS-protected TCP connection.
-
-However, the GridDB Cloud public native route still uses an HTTPS Notification
-Provider URL for cluster discovery. Therefore:
-
-- If the policy prohibits the **GridDB Web API**, this architecture meets that
-  requirement.
-- If the policy prohibits **all HTTPS traffic**, the public native route does
-  not meet it because discovery still uses HTTPS.
-
-For an all-private environment, deploy the Node.js and Python application inside
-an Azure VNet peered to GridDB Cloud and use the private connection route
-provided for that Cloud deployment.
-
-Node.js and Python do not communicate over HTTP in either case. Their local
-protocol is NDJSON carried by the child process's stdin and stdout streams.
-
 ## Further Enhancements
 
 This project is deliberately small, but it can be extended in practical ways:
