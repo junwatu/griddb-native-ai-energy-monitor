@@ -548,7 +548,7 @@ Forecasting needs history: `create_forecast` refuses to run with fewer than 16 r
 
 ### Features
 
-The model only sees four numbers: the time of day (as two values, `sin` and `cos`), how much power the device is using right now, and how its load has moved over the last hour. Time is placed on a clock face (sin and cos) so that 23:00 and 00:00 sit next to each other, just like a real clock wraps around midnight. The latest reading anchors the prediction to the current level, while the one-hour average smooths out a single noisy reading.
+The model only sees four numbers: the time of day (as two values, sin and cos), how much power the device is using right now, and how its load has moved over the last hour. Time is placed on a clock face (sin and cos) so 23:00 and 00:00 sit next to each other, like a real clock wrapping around midnight. The latest reading anchors the prediction to the current level, while the one-hour average smooths out a single noisy reading.
 
 Together they answer: "it is mid-afternoon, the AC has been pulling around 900 watts, and it has been climbing gently—so the next 15 minutes will probably look similar."
 
@@ -568,11 +568,7 @@ def feature(timestamp: dt.datetime, history: list[float]) -> list[float]:
 
 Predicting the future is harder, because there is nothing to peek at. So the model fakes it: it guesses the next value, adds that guess to its history as if it were a real reading, and repeats. Each step builds on its own previous guess—like walking through fog, placing each step based on where you think you are.
 
-The loop repeats 96 times because 96 fifteen-minute steps add up to exactly 24
-hours. One honest caveat: because the model feeds its own guesses back in, a
-bad guess early can pull later guesses down with it. That is why real forecasts
-get less certain the further out they look, and why this prototype keeps its
-uncertainty band fixed, a deliberate simplification.
+The loop repeats 96 times because 96 fifteen-minute steps add up to exactly 24 hours. One honest caveat: because the model feeds its own guesses back in, a bad guess early can pull later guesses down with it. That is why real forecasts get less certain the further out they look, and why this prototype keeps its uncertainty band fixed, a deliberate simplification.
 
 
 ```python
@@ -585,12 +581,10 @@ for step in range(1, HORIZON + 1):
 
 ### Error band from the training
 
-After fitting, the worker predicts its own training readings again to measure
-how far off it typically is. That average miss is the mean absolute error
+After fitting, the worker predicts its own training readings again to measure how far off it typically is. That average miss is the mean absolute error
 (MAE): a model with an MAE of 40 watts is typically off by about 40 watts.
 
-A prediction of 900 watts will not really land on exactly 900 watts—meters, weather, and building use all vary. So every forecast value also carries a band, meaning “the real reading will probably fall somewhere in this range.” The band is sized by two things: how accurate the model has proven to be (its typical miss on the training data) and the size of the
-prediction itself. The typical miss is scaled up so that roughly nine out of ten real values should land inside the band, and a ten percent floor keeps the band from collapsing to nothing when the predicted load is very small.
+A prediction of 900 watts will not really land on exactly 900 watts—meters, weather, and building use all vary. So every forecast value also carries a band, meaning “the real reading will probably fall somewhere in this range.” The band is sized by two things: how accurate the model has proven to be (its typical miss on the training data) and the size of the prediction itself. The typical miss is scaled up so that roughly nine out of ten real values should land inside the band, and a ten percent floor keeps the band from collapsing to nothing when the predicted load is very small.
 
 Both ideas fold into one line of code:
 
@@ -617,9 +611,7 @@ forecasts.put(
 )
 ```
 
-Using `target_timestamp` as the row key means a newer calculation replaces the
-older forecast for the same target interval. This keeps the dashboard focused
-on the latest prediction.
+Using `target_timestamp` as the row key means a newer calculation replaces the older forecast for the same target interval. This keeps the dashboard focused on the latest prediction.
 
 ## Reading Results in Node.js
 
@@ -653,10 +645,8 @@ The dashboard can show:
 - Predicted next-24-hour energy and cost
 - Data quality and last reading time
 
-> **Screenshot placeholder:** Dashboard with actual and predicted energy.
+![forecast](assets/dashboard-forecast.png)
 
-> **Screenshot placeholder:** GridDB Cloud view of the raw and forecast
-> containers.
 
 ## Connecting a Real Electricity Meter
 
@@ -689,9 +679,7 @@ This project is deliberately small, but it can be extended in practical ways:
 7. Deploy the application inside Azure VNet for private GridDB access.
 8. Add authentication, role-based device access, and an audit log.
 9. Add row expiration or an archival policy for high-frequency raw readings.
-10. Compare per-device containers with an interval-hash partitioned table when
-    scaling to a large fleet. GridDB table partitioning must be created through
-    the NewSQL interface.
+10. Compare per-device containers with an interval-hash partitioned table when scaling to a large fleet. GridDB table partitioning must be created through the NewSQL interface.
 
 An LLM is not required for the core application. If one is added later, it
 should explain verified calculations and model outputs rather than inventing
@@ -699,18 +687,13 @@ energy or anomaly values.
 
 ## Conclusion
 
-In this guide, we combined Node.js, Python, and GridDB Cloud to build a practical
-energy-monitoring pipeline without using the GridDB Web API.
+In this guide, we combined Node.js, Python, and GridDB Cloud to build a practical energy-monitoring pipeline without using the GridDB Web API.
 
-Node.js remains the application layer. A persistent Python worker hides JPype
-and the Java client, GridDB stores the time-series history, and a lightweight
-scikit-learn model predicts the next 24 hours of energy consumption locally.
+Node.js remains the application layer. A persistent Python worker hides JPype and the Java client, GridDB stores the time-series history, and a lightweight scikit-learn model predicts the next 24 hours of energy consumption locally.
 
 The important design choice is to use AI only where it adds a measurable result.
-Energy totals and costs stay deterministic, while forecasting learns repeating
-patterns that fixed formulas cannot model as easily.
+Energy totals and costs stay deterministic, while forecasting learns repeating patterns that fixed formulas cannot model as easily.
 
 The simulator makes the project easy to reproduce, and the input boundary is
-small enough to replace with a real MQTT or Modbus electricity meter later. This
-makes the prototype suitable both as a GridDB Cloud native-client tutorial and
-as the starting point for a real energy-monitoring application.
+small enough to replace with a real MQTT or Modbus electricity meter later. 
+This makes the prototype suitable both as a GridDB Cloud native-client tutorial and as the starting point for a real energy-monitoring application.
