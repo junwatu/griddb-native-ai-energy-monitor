@@ -23,40 +23,28 @@
 ## What This Blog Is About
 
 Electricity monitoring becomes much more useful when it can answer questions,
-not only draw a chart. How much energy did an air conditioner consume today? Is
-a refrigerator using more power than normal? Based on recent history, how much
-electricity will this site consume during the next 24 hours?
+not only draw a chart. How much energy did an air conditioner consume today? Is a refrigerator using more power than normal? Based on recent history, how much electricity will this site consume during the next 24 hours?
 
-In this guide, we build an energy-monitoring application using Node.js, Python,
-and GridDB Cloud on Azure Marketplace. Node.js controls the application, Python
-runs a lightweight forecasting model, and GridDB stores timestamped electricity
-measurements and forecast results.
+In this guide, we build an energy-monitoring application using Node.js, Python, and GridDB Cloud on Azure Marketplace. Node.js controls the application, Python runs a lightweight forecasting model, and GridDB stores timestamped electricity measurements and forecast results.
 
 
 ## What We Will Build
 
 The finished prototype has four main features:
 
-1. Generate realistic electricity readings for an air conditioner and a
-   refrigerator.
-2. Store voltage, current, power, and interval energy in GridDB TimeSeries
-   containers.
+1. Generate realistic electricity readings for an air conditioner and a refrigerator.
+2. Store voltage, current, power, and interval energy in GridDB TimeSeries containers.
 3. Show recent readings and calculate energy cost in a Node.js dashboard.
-4. Use a small machine-learning model to forecast energy consumption for the
-   next 24 hours.
+4. Use a small machine-learning model to forecast energy consumption for the next 24 hours.
 
-The first version uses simulated readings so anyone can run it without buying
-hardware. At the end of the article, we show where an MQTT or Modbus electricity
-meter can be connected without changing the GridDB or forecasting layers.
+The first version uses simulated readings so anyone can run it without buying hardware.
 
-> **Screenshot placeholder:** Final dashboard showing live watts, today's cost,
-> a 24-hour chart, and the next-day forecast.
+![app dashboard](assets/dashboard.png)
+
 
 ## Why Use the Native GridDB Client?
 
-GridDB Cloud offers a Web API, but some environments do not allow database
-operations through an HTTP API. GridDB Cloud v3.2 also supports public access
-from native Java and Python clients by using `connectionRoute=PUBLIC`.
+GridDB Cloud offers a Web API, but some environments do not allow database operations through an HTTP API. GridDB Cloud v3.2 also supports public access from native Java and Python clients by using `connectionRoute=PUBLIC`.
 
 For this project, the data path is:
 
@@ -64,40 +52,30 @@ For this project, the data path is:
 Node.js -> NDJSON over stdio -> Python/JPype -> GridDB native TLS/TCP -> GridDB Cloud
 ```
 
-The current GridDB Python client is built on the GridDB Java API, JPype, and
-Apache Arrow. This is useful for Node.js developers because Python can hide the
-Java runtime details behind a small process bridge. Node.js sends a JSON command
-and receives a JSON response while one persistent Python/JVM process owns the
-database connection.
+The current GridDB Python client is built on the GridDB Java API, JPype, and Apache Arrow. This is useful for Node.js developers because Python can hide the Java runtime details behind a small process bridge. Node.js sends a JSON command and receives a JSON response while one persistent Python/JVM process owns the database connection.
 
-Keeping the worker alive is important. Starting a JVM for every reading would
-be slow and would create unnecessary GridDB connections.
+Keeping the worker alive is important. Starting a JVM for every reading would be slow and would create unnecessary GridDB connections.
 
-For background on the public native route, see [Connecting to GridDB Cloud v3.2
-from Your Local Dev Environment](https://www.griddb.net/en/blog/connecting-to-griddb-cloud-v3-2-from-your-local-dev-environment-no-vpn-no-vnet-peering/).
+For background on the public native route, see [Connecting to GridDB Cloud v3.2 from Your Local Dev Environment](https://www.griddb.net/en/blog/connecting-to-griddb-cloud-v3-2-from-your-local-dev-environment-no-vpn-no-vnet-peering/).
 
 ## Prerequisites
 
 ### Node.js
 
-Install Node.js 18 or newer. The sample uses only built-in Node.js modules for
+Install [Node.js](https://nodejs.org/en/download/current) 18 or newer. The sample uses only built-in Node.js modules for
 the process bridge, so no HTTP framework is required for database access.
 
 ### Python
 
-The current GridDB Python client documents Python 3.12 as a tested environment.
-We use a project virtual environment so JPype, PyArrow, GridDB Python, and
-scikit-learn do not affect the system Python installation.
+The current GridDB Python client documents Python 3.12 as a tested environment. We use a project virtual environment so JPype, PyArrow, GridDB Python, and scikit-learn do not affect the system Python installation.
 
 ### Java and Maven
 
-The GridDB Python package uses the Java API through JPype. On macOS, this project
-uses OpenJDK 21 and Maven installed with Homebrew.
+The GridDB Python package uses the Java API through JPype. On macOS, this project uses OpenJDK 21 and Maven installed with Homebrew.
 
 ### GridDB Cloud on Azure Marketplace
 
-This article assumes a GridDB Cloud v3.2 service obtained through Azure
-Marketplace.
+This article assumes a GridDB Cloud v3.2 service obtained through Azure Marketplace.
 
 For the public native route:
 
@@ -167,7 +145,7 @@ native-bridge/scripts/install-cloud-jar.sh \
   native-bridge/GridDB_Cloud_doc_lib/griddb-ee-java-lib-5.9.0-linux.x86_64.rpm
 ```
 
-Although the package is an RPM, `gridstore-advanced.jar` contains portable Java bytecode and can be used on macOS after extraction. JPype and PyArrow are not platform-independent JARs; the setup script installs their matching macOSPython wheels separately.
+Although the package is an RPM, `gridstore-advanced.jar` contains portable Java bytecode and can be used on macOS after extraction. JPype and PyArrow are not platform-independent JARs; the setup script installs their matching macOS Python wheels separately.
 
 Inside the RPM, the helper finds the real versioned file:
 
@@ -181,10 +159,8 @@ It copies that file into the project using the stable runtime name:
 native-bridge/lib/gridstore-advanced.jar
 ```
 
-Do not use `griddb-ee-webapi-5.9.0-linux.x86_64.rpm`; that package installs the
-GridDB Web API, which is deliberately outside this application's architecture.
-Do not use the `griddb-ee-c-lib` package either, because this project loads the
-Java client through Python and JPype.
+Do not use `griddb-ee-webapi-5.9.0-linux.x86_64.rpm`; that package installs the GridDB Web API, which is deliberately outside this application's architecture.
+Do not use the `griddb-ee-c-lib` package either, because this project loads the Java client through Python and JPype.
 
 Check the installation:
 
@@ -195,9 +171,15 @@ npm run doctor
 A successful local runtime check ends with:
 
 ```text
+PASS  Node.js 18+
+PASS  npm
+PASS  Python
 PASS  Java
+PASS  Maven
 PASS  GridDB public JAR
+PASS  GridDB Arrow JAR
 PASS  GridDB Cloud JAR
+PASS  Environment file
 PASS  Python GridDB runtime
 
 The local GridDB runtime is ready.
@@ -242,18 +224,15 @@ exporting is only necessary when running the native-bridge package directly.
 
 ### 5. Initialize the GridDB containers
 
-Before the first run, initialize the application schema through the native
-GridDB connection:
+Before the first run, initialize the application schema through the native GridDB connection:
 
 ```bash
 npm run init
 ```
 
-The initializer creates the `devices` registry and the raw-reading and forecast TimeSeries containers used by the sample devices. It is idempotent: running it again leaves compatible containers in place instead of deleting their data. If an existing container has an incompatible column definition, the command stopsand reports the mismatch rather than silently replacing it.
+The initializer creates the `devices` registry and the raw-reading and forecast TimeSeries containers used by the sample devices. It is idempotent: running it again leaves compatible containers in place instead of deleting their data. If an existing container has an incompatible column definition, the command stops and reports the mismatch rather than silently replacing it.
 
-Initialization uses the same Node.js-to-Python bridge as the application. It
-does not call the GridDB Web API, and it closes the native GridDB connection
-after checking or creating the schema.
+Initialization uses the same Node.js-to-Python bridge as the application. It does not call the GridDB Web API, and it closes the native GridDB connection after checking or creating the schema.
 
 An expected first run looks similar to this:
 
@@ -278,42 +257,29 @@ Open the URL printed by the application.
 http://localhost:3000
 ```
 
-![app dashboard](assets/dashboard.png)
-
 ## System Architecture
 
 The system has five responsibilities.
 
 ### Energy data source
 
-For the tutorial, a Node.js simulator produces a reading every 15 minutes. It
-models normal daily cycles and adds small random variations. This provides
-enough historical data to demonstrate forecasting without requiring hardware.
+For the tutorial, a Node.js simulator produces a reading every 15 minutes. It models normal daily cycles and adds small random variations. This provides enough historical data to demonstrate forecasting without requiring hardware.
 
 ### Node.js application
 
-Node.js orchestrates the application. It starts the Python worker, sends
-database commands, calculates simple costs, and provides data to the dashboard.
+Node.js orchestrates the application. It starts the Python worker, sends database commands, calculates simple costs, and provides data to the dashboard.
 
 ### Python GridDB worker
 
-One persistent Python process starts the JVM, loads the GridDB JARs, creates the
-GridDB connection, and executes `put`, `get`, and TQL query operations. Node.js
-and Python exchange newline-delimited JSON over stdin and stdout.
+One persistent Python process starts the JVM, loads the GridDB JARs, creates the GridDB connection, and executes `put`, `get`, and TQL query operations. Node.js and Python exchange newline-delimited JSON (NDJSON) over stdin and stdout.
 
 ### Forecasting model
 
-Python trains a `HistGradientBoostingRegressor` on hour-of-day and lagged
-wattage features, then recursively predicts the next 96 fifteen-minute
-intervals. It runs locally inside the Python process and does not call an
-external AI API.
+Python trains a `HistGradientBoostingRegressor` on hour-of-day and lagged wattage features, then recursively predicts the next 96 fifteen-minute intervals. It runs locally inside the Python process and does not call an  external AI API.
 
 ### GridDB Cloud
 
-GridDB stores the device registry, raw TimeSeries readings, forecasts, and
-alerts. A timestamp row key makes recent-window queries natural, while separate
-containers prevent different devices reporting at the same timestamp from
-colliding.
+GridDB stores the device registry, raw TimeSeries readings, forecasts, and alerts. A timestamp row key makes recent-window queries natural, while separate containers prevent different devices reporting at the same timestamp from colliding.
 
 ![AI energy monitor architecture using Node.js, Python, JPype, and GridDB Cloud](assets/system-architecture.webp)
 
@@ -324,8 +290,7 @@ connection—without using the Web API.*
 
 ## GridDB Schema
 
-The prototype uses one registry collection and two TimeSeries containers per
-meter.
+The prototype uses one registry collection and two TimeSeries containers per meter.
 
 ![GridDB schema and data flow for the AI energy monitor](assets/griddb-schema.webp)
 
@@ -372,14 +337,9 @@ forecast data.*
 | `model_version` | STRING | Model identifier |
 | `generated_at` | TIMESTAMP | Forecast creation time |
 
-GridDB TimeSeries containers require a `TIMESTAMP` row key. A collection can use
-a `STRING`, numeric, or timestamp key and can also support a composite key. See
-the [GridDB data model](https://docs.griddb.net/architecture/data-model.html) for
-the current constraints.
+GridDB TimeSeries containers require a `TIMESTAMP` row key. A collection can use a `STRING`, numeric, or timestamp key and can also support a composite key. See the [GridDB data model](https://docs.griddb.net/architecture/data-model.html) for the current constraints.
 
-We use a wide TimeSeries row because voltage, current, power, and energy belong
-to the same observation. The [GridDB wide versus narrow schema guide](https://docs.griddb.net/tutorial/wide-narrow.html)
-describes the tradeoff in more detail.
+We use a wide TimeSeries row because voltage, current, power, and energy belong to the same observation. The [GridDB wide versus narrow schema guide](https://docs.griddb.net/tutorial/wide-narrow.html) describes the tradeoff in more detail.
 
 ## Technical Implementation
 
