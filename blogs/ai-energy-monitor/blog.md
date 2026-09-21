@@ -375,8 +375,7 @@ The worker sends exactly one response with the same ID:
 {"id":12,"ok":true,"result":[...]}
 ```
 
-This request ID allows several asynchronous Node.js calls to share the same
-Python worker safely.
+This request ID allows several asynchronous Node.js calls to share the same Python worker safely.
 
 ### Loading the GridDB runtime
 
@@ -463,13 +462,11 @@ def ensure_energy_container(store, device_id: str):
     return store.put_container(info)
 ```
 
-Only allow normalized device identifiers, for example lowercase letters,
-digits, and underscores, before combining a device ID with a container name.
+Only allow normalized device identifiers, for example lowercase letters, digits, and underscores, before combining a device ID with a container name.
 
 ### Inserting energy readings
 
-JSON does not preserve a Python `datetime`, so the worker converts the incoming
-ISO timestamp before writing the row:
+JSON does not preserve a Python `datetime`, so the worker converts the incoming ISO timestamp before writing the row:
 
 ```python
 def parse_timestamp(value: str):
@@ -507,9 +504,7 @@ At a 15-minute interval, energy is calculated from average watts:
 const intervalEnergyWh = averageWatts * (15 / 60);
 ```
 
-For real hardware, prefer an interval or cumulative energy value reported by
-the meter. It will usually be more accurate than integrating occasional power
-samples in the application.
+For real hardware, prefer an interval or cumulative energy value reported by the meter. It will usually be more accurate than integrating occasional power samples in the application.
 
 ### Querying the most recent readings
 
@@ -530,24 +525,17 @@ const totalKwh = totalWh / 1000;
 const cost = totalKwh * device.pricePerKwh;
 ```
 
-This calculation is normal application logic, not AI. Keeping it deterministic
-makes the number easy to audit.
+This calculation is normal application logic, not AI. Keeping it deterministic makes the number easy to audit.
 
 ## Forecasting the Next 24 Hours
 
-The forecasting model has one job: predict how much energy the device will use
-during the next 24 hours, one 15-minute interval at a time.
+The forecasting model has one job: predict how much energy the device will use during the next 24 hours, one 15-minute interval at a time.
 
-We use scikit-learn's `HistGradientBoostingRegressor` configured to stay small
-and fast (`learning_rate=0.08`, `max_iter=150`, `max_leaf_nodes=15`,
-`min_samples_leaf=4`, `l2_regularization=1.0`). It handles nonlinear
-relationships and does not require a GPU or an external AI service. The complete
-implementation lives in `python/forecast.py`.
+We use scikit-learn's `HistGradientBoostingRegressor` configured to stay small and fast. It handles nonlinear relationships and does not require a GPU or an external AI service. The complete implementation lives in `python/forecast.py`.
 
 ### Training on seven days of history
 
-The model trains on the most recent seven days of readings. The worker queries
-the device TimeSeries for the last 168 hours:
+The model trains on the most recent seven days of readings. The worker queries the device `TimeSeries` for the last 168 hours:
 
 ```python
 row_set = container.query(
@@ -556,22 +544,13 @@ row_set = container.query(
 ).fetch()
 ```
 
-Forecasting needs history: `create_forecast` refuses to run with fewer than 16
-readings, and the first feature vector needs four lagged readings. The seed
-command inserts one day of demo readings, which is enough to run the model, but
-the daily pattern becomes more meaningful as real history accumulates over the
-full seven-day window.
+Forecasting needs history: `create_forecast` refuses to run with fewer than 16 readings, and the first feature vector needs four lagged readings. The seed command inserts one day of demo readings, which is enough to run the model, but the daily pattern becomes more meaningful as real history accumulates over the full seven-day window.
 
 ### Features
 
-Each reading becomes a feature vector with four values:
+The model only sees four numbers: the time of day (as two values, `sin` and `cos`), how much power the device is using right now, and how its load has moved over the last hour. Time is placed on a clock face (sin and cos) so that 23:00 and 00:00 sit next to each other, just like a real clock wraps around midnight. The latest reading anchors the prediction to the current level, while the one-hour average smooths out a single noisy reading.
 
-- The hour of day encoded with `sin` and `cos`, so 23:00 and 00:00 are close
-  together in feature space and the model can reuse the daily load curve
-- The most recent wattage reading, which anchors the prediction to the current
-  consumption level
-- The mean of the last four readings, which summarizes the trend over the last
-  hour
+Together they answer: "it is mid-afternoon, the AC has been pulling around 900 watts, and it has been climbing gently—so the next 15 minutes will probably look similar."
 
 ```python
 def feature(timestamp: dt.datetime, history: list[float]) -> list[float]:
@@ -587,15 +566,14 @@ def feature(timestamp: dt.datetime, history: list[float]) -> list[float]:
 
 ### One-step-ahead training, recursive prediction
 
-The model learns a one-step-ahead predictor. For every reading after the first
-four, the features describe everything observed before it, and the target is
-that reading itself.
+Predicting the future is harder, because there is nothing to peek at. So the model fakes it: it guesses the next value, adds that guess to its history as if it were a real reading, and repeats. Each step builds on its own previous guess—like walking through fog, placing each step based on where you think you are.
 
-Predicting the future has no observations to draw on, so the forecast rolls
-forward one interval at a time. The loop starts from the last observed reading,
-predicts the next 15-minute value, and appends the prediction to the working
-history so the next step can use it. It repeats for 96 steps, exactly 24 hours
-at a 15-minute interval:
+The loop repeats 96 times because 96 fifteen-minute steps add up to exactly 24
+hours. One honest caveat: because the model feeds its own guesses back in, a
+bad guess early can pull later guesses down with it. That is why real forecasts
+get less certain the further out they look, and why this prototype keeps its
+uncertainty band fixed, a deliberate simplification.
+
 
 ```python
 rolling = list(watts)
@@ -605,31 +583,26 @@ for step in range(1, HORIZON + 1):
     rolling.append(predicted_watts)
 ```
 
-### Error band from the training MAE
+### Error band from the training
 
-After fitting, the worker predicts its own training readings again and computes
-the mean absolute error (MAE) between predictions and targets:
+After fitting, the worker predicts its own training readings again to measure
+how far off it typically is. That average miss is the mean absolute error
+(MAE): a model with an MAE of 40 watts is typically off by about 40 watts.
 
-```python
-fitted = model.predict(np.asarray(features))
-mae = float(np.mean(np.abs(np.asarray(targets) - fitted)))
-```
+A prediction of 900 watts will not really land on exactly 900 watts—meters, weather, and building use all vary. So every forecast value also carries a band, meaning “the real reading will probably fall somewhere in this range.” The band is sized by two things: how accurate the model has proven to be (its typical miss on the training data) and the size of the
+prediction itself. The typical miss is scaled up so that roughly nine out of ten real values should land inside the band, and a ten percent floor keeps the band from collapsing to nothing when the predicted load is very small.
 
-Every prediction carries an uncertainty band derived from that MAE. The band is
-the larger of 1.64 times the training MAE and 10 percent of the predicted
-value: the MAE term scales with the model's observed accuracy, while the
-percentage floor keeps the band meaningful when the prediction is near zero:
+Both ideas fold into one line of code:
 
 ```python
 error_band = max(mae * 1.64, predicted_watts * 0.1)
 ```
 
+The prototype stores the band with every forecast row, but the dashboard does not draw it yet—the chart shows only the predicted line. The columns are ready for a shaded confidence range later.
+
 ### Saving the forecast
 
-The result is stored in `forecast_<device_id>`. Each row is one forecast
-interval. Watts are converted to interval energy in watt-hours by multiplying
-by 0.25, because one 15-minute interval is a quarter of an hour, and the bounds
-are clipped at zero:
+The result is stored in `forecast_<device_id>`. Each row is one forecast interval. Watts are converted to interval energy in watt-hours by multiplying by 0.25, because one 15-minute interval is a quarter of an hour, and the bounds are clipped at zero:
 
 ```python
 forecasts.put(
@@ -648,18 +621,9 @@ Using `target_timestamp` as the row key means a newer calculation replaces the
 older forecast for the same target interval. This keeps the dashboard focused
 on the latest prediction.
 
-> **Editorial TODO:** The MAE above is measured in-sample on the training
-> readings. Before publishing an accuracy claim, hold out the newest readings
-> as a chronological test set and evaluate on them--shuffling a time series
-> leaks future behavior into training. Scikit-learn's [lagged-feature
-> forecasting example](https://scikit-learn.org/stable/auto_examples/applications/plot_time_series_lagged_features.html)
-> demonstrates chronological evaluation. Add the test-period MAE/MAPE and one
-> forecast chart after running the completed project.
-
 ## Reading Results in Node.js
 
-Node.js queries the last 24 hours of readings and the next 24 hours of forecast
-rows, then prepares a small view model:
+Node.js queries the last 24 hours of readings and the next 24 hours of forecast rows, then prepares a small view model:
 
 ```js
 const [readings, forecasts] = await Promise.all([
@@ -678,11 +642,7 @@ const actualKwh = readings.reduce((sum, row) => sum + row[5], 0) / 1000;
 const forecastKwh = forecasts.reduce((sum, row) => sum + row[1], 0) / 1000;
 ```
 
-The forecast query returns up to 96 rows: one per 15-minute interval, covering
-the next 24 hours. The dashboard sums the `predicted_energy_wh` column for the
-24-hour total and cost, and draws the rows as a dashed curve next to the
-measured readings. The chart therefore shows the past 24 hours of actual load
-followed by the next 24 hours of prediction.
+The forecast query returns up to 96 rows: one per 15-minute interval, covering the next 24 hours. The dashboard sums the `predicted_energy_wh` column for the 24-hour total and cost, and draws the rows as a dashed curve next to the measured readings. The chart therefore shows the past 24 hours of actual load followed by the next 24 hours of prediction.
 
 The dashboard can show:
 
@@ -700,8 +660,7 @@ The dashboard can show:
 
 ## Connecting a Real Electricity Meter
 
-The simulator is only a data-source adapter. A real deployment can replace it
-with MQTT or Modbus TCP:
+The simulator is only a data-source adapter. A real deployment can replace it with MQTT or Modbus TCP:
 
 ```text
 MQTT meter -> Node.js MQTT subscriber -> client.request("put_energy", ...)
@@ -713,18 +672,8 @@ or:
 Modbus meter -> Node.js Modbus poller -> client.request("put_energy", ...)
 ```
 
-The remaining layers do not change. The same GridDB schema, TQL queries,
-forecasting code, and dashboard continue to work.
+The remaining layers do not change. The same GridDB schema, TQL queries, forecasting code, and dashboard continue to work.
 
-A production adapter should also handle:
-
-- Meter timestamps and clock drift
-- Duplicate messages
-- Missing intervals
-- Reconnects and buffered writes
-- Cumulative-meter rollover
-- Measurement quality
-- Device-specific scaling factors
 
 ## Further Enhancements
 
