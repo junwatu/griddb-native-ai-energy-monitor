@@ -341,6 +341,9 @@ GridDB TimeSeries containers require a `TIMESTAMP` row key. A collection can use
 
 We use a wide TimeSeries row because voltage, current, power, and energy belong to the same observation. The [GridDB wide versus narrow schema guide](https://docs.griddb.net/tutorial/wide-narrow.html) describes the tradeoff in more detail.
 
+![containers](assets/containers.png)
+
+
 ## Technical Implementation
 
 ### Starting a persistent Python worker
